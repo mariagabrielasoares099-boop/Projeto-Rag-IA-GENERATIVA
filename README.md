@@ -90,22 +90,75 @@ git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
 cd Rag
 ```
 
-### 2. Criar e Ativar o Ambiente Virtual (`venv`)
-- **No Windows (PowerShell):**
+### 2. Procedimento de Criação e Ativação do Ambiente Virtual (`venv`)
+
+O uso de um ambiente virtual isola todas as dependências e evita conflitos com pacotes globais do sistema.
+
+#### Passo 2.1 — Criar o ambiente virtual:
+Abra o terminal na pasta raiz do projeto (`Rag`) e execute:
+
+- **Windows:**
   ```powershell
   python -m venv venv
-  .\venv\Scripts\Activate.ps1
   ```
-- **No Linux / macOS:**
+- **Linux / macOS:**
   ```bash
   python3 -m venv venv
+  ```
+*(Uma pasta chamada `venv/` será criada localmente contendo o interpretador Python isolado).*
+
+#### Passo 2.2 — Ativar o ambiente virtual:
+Conforme o seu sistema e terminal, execute o comando de ativação correspondente:
+
+- **Windows (PowerShell):**
+  ```powershell
+  .\venv\Scripts\Activate.ps1
+  ```
+  > 💡 **Dica (Erro de Script no PowerShell):** Se o Windows exibir um erro de política de execução (`execution of scripts is disabled`), habilite a execução para o processo atual rodando:
+  > ```powershell
+  > Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+  > .\venv\Scripts\Activate.ps1
+  > ```
+
+- **Windows (Prompt de Comando - CMD):**
+  ```cmd
+  .\venv\Scripts\activate.bat
+  ```
+
+- **Linux / macOS (Bash ou Zsh):**
+  ```bash
   source venv/bin/activate
   ```
 
-### 3. Instalar as Dependências
+#### Passo 2.3 — Confirmar a ativação:
+Quando o ambiente estiver ativo, o prefixo `(venv)` aparecerá no início da linha de comando do seu terminal:
+```text
+(venv) PS C:\Users\...\Rag>
+```
+
+---
+
+### 3. Instalação dos Pacotes do `requirements.txt`
+
+Com o ambiente virtual devidamente ativo `(venv)`:
+
+#### Passo 3.1 — Atualizar o gerenciador `pip` (Recomendado):
+```bash
+python -m pip install --upgrade pip
+```
+
+#### Passo 3.2 — Instalar todas as dependências do projeto:
 ```bash
 pip install -r requirements.txt
 ```
+
+#### Passo 3.3 — Conferir a instalação:
+Para verificar se as principais bibliotecas foram instaladas com sucesso, você pode listar os pacotes principais:
+```bash
+python -c "import fastapi, streamlit, fastembed, supabase; print('Dependências instaladas com sucesso!')"
+```
+
+---
 
 ### 4. Configurar as Variáveis de Ambiente
 Copie o arquivo `.env.example` para `.env`:
@@ -146,6 +199,12 @@ Em outro terminal com o `venv` ativo:
 streamlit run app.py
 ```
 Acesse a interface no navegador: **[http://localhost:8501](http://localhost:8501)**
+
+### 9. Desativar o Ambiente Virtual (Ao Encerrar)
+Quando terminar de utilizar ou testar o projeto, desative o ambiente virtual rodando:
+```bash
+deactivate
+```
 
 ---
 
