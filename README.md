@@ -1,132 +1,163 @@
-# 🎃 Rag + Gabi | Aplicação RAG Didática e Visual
+# 🎃 Rag + Gabi | Aplicação RAG Didática e Visual (Halloween Edition)
 
-Sistema RAG (Retrieval-Augmented Generation) educacional e interativo focado na compreensão de ponta a ponta do pipeline de dados, desenvolvido com **FastAPI**, **Streamlit**, **FastEmbed**, **Supabase (pgvector)** e **OpenRouter**.
+<p align="center">
+  <img src="assets/rag_gabi_mascot.jpg" alt="Mascote Rag + Gabi" width="360" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(255, 110, 20, 0.4);" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.13-blue.svg?logo=python" alt="Python 3.13" />
+  <img src="https://img.shields.io/badge/Streamlit-1.65-FF4B4B.svg?logo=streamlit" alt="Streamlit" />
+  <img src="https://img.shields.io/badge/FastAPI-0.142-009688.svg?logo=fastapi" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Supabase-PGVector-3ECF8E.svg?logo=supabase" alt="Supabase PGVector" />
+  <img src="https://img.shields.io/badge/Embeddings-FastEmbed-9933FF.svg" alt="FastEmbed" />
+  <img src="https://img.shields.io/badge/LLM-OpenRouter-black.svg" alt="OpenRouter" />
+</p>
 
 ---
 
-## 🐱 Identidade Visual & Conceito
-- **Tema:** Halloween Dark Glow (tons de roxo profundo `#120822` e laranja neon `#ff6e14`).
-- **Mascote:** **Rag + Gabi** — Gatinho travesso e fofinho de Halloween com o machado cenográfico de Lizzie Borden.
+## 📖 Visão Geral do Projeto
+O **Rag + Gabi** é uma aplicação educacional desenvolvida para demonstrar de ponta a ponta o funcionamento de uma arquitetura **RAG (Retrieval-Augmented Generation)**. 
+
+O sistema processa Notas Fiscais (DANFE) em PDF, extrai dados estruturados em formato tabular, divide os textos em chunks semânticos, gera representações vetoriais densas de 384 dimensões via **FastEmbed**, armazena e recupera os dados no banco vetorial remoto **Supabase (pgvector)** e responde via **OpenRouter** com uma **regra estrita antialucinação**.
 
 ---
 
-## 🏗️ Arquitetura & Fluxo de Processamento
+## 🎨 Identidade Visual & Temática
+- **Conceito:** Rag + Gabi (Gatinho travesso e fofinho de Halloween com machado cenográfico de Lizzie Borden).
+- **Design:** Tema Dark Glow temático de Halloween (fundo roxo escuro `#120822`, destaque em laranja neon `#ff6e14` e tipografia de alto contraste para máxima legibilidade).
 
-### 1. Pipeline de Ingestão de Dados (Página A)
-```
-[PDFs de Notas Fiscais]
-         │
-         ▼
-     INGESTÃO (Extração de texto via pypdf)
-         │
-         ▼
-     CHUNKING (Segmentação semântica e estruturação tabular)
-         │
-         ▼
-   TOKENIZAÇÃO (Sentence Transformers Tokenizer)
-         │
-         ▼
-    EMBEDDING (Vetores densos de 384 dimensões via FastEmbed)
-         │
-         ▼
- ÍNDICE VETORIAL (Supabase PGVector / Cache de redundância)
-```
+---
 
-### 2. Pipeline de Consulta e Chat RAG (Página B)
-```
-[Pergunta do Usuário]
-         │
-         ▼
-    PERGUNTA
-         │
-         ▼
-   TOKENIZAÇÃO
-         │
-         ▼
-    EMBEDDING (FastEmbed query vector)
-         │
-         ▼
-    RETRIEVAL (Top-k=5 vizinhos mais próximos via Cosseno)
-         │
-    ┌────┴────────────────────────┐
-    ▼                             ▼
-[Candidatos Encontrados]    [Sem Candidatos / Score Baixo]
-    │                             │
-    ▼                             ▼
-PROMPT AUMENTADO           REGRA ANTIALUCINAÇÃO ESTRITA
-    │                             │
-    ▼                             ▼
-LLM via OpenRouter         "Sem dados disponíveis na base"
-    │
-    ▼
-Resposta Fundamentada + Top-5 Expander
+## 🏗️ Arquitetura do Sistema
+
+```mermaid
+flowchart TD
+    subgraph Ingestao ["1. Painel de Ingestão de Dados (Página A)"]
+        A[PDFs de Notas Fiscais] --> B[Extração OCR / Texto com pypdf]
+        B --> C[Estruturação Tabular Dataframe]
+        C --> D[Chunking Semântico com Metadados]
+        D --> E[Tokenização Sentence Transformers]
+        E --> F[FastEmbed Embeddings 384 dims]
+        F --> G[(Supabase PGVector)]
+    end
+
+    subgraph Chat ["2. Painel de Consulta RAG (Página B)"]
+        H[Pergunta do Usuário] --> I[Tokenização da Query]
+        I --> J[FastEmbed Query Vector]
+        J --> K[Retrieval Cosine Similarity top_k=5]
+        G -.-> K
+        K --> L{Entidade ou dado existe na base?}
+        L -- Não / Divergente --> M["'não possuo essa informação na base de dados'"]
+        L -- Sim --> N[Prompt Aumentado com Contexto Literal]
+        N --> O[LLM via OpenRouter openrouter/auto]
+        O --> P[Resposta Fundamentada + Top-5 Expander com Scores]
+    end
 ```
 
 ---
 
-## 📂 Estrutura de Arquivos
+## 📂 Estrutura de Diretórios
 
 ```
 Rag/
 ├── assets/
-│   └── rag_gabi_mascot.jpg        # Mascote oficial Rag + Gabi Halloween
-├── dados_notas_fiscais/            # 4 PDFs de Notas Fiscais fictícias geradas
+│   └── rag_gabi_mascot.jpg          # Mascote visual do projeto Rag + Gabi
+├── dados_notas_fiscais/              # Base de 4 PDFs de Notas Fiscais fictícias
 │   ├── NF_001_Gatinhos_Petshop.pdf
 │   ├── NF_002_Servicos_Tech_Rag.pdf
 │   ├── NF_003_Loja_Fantasias_Halloween.pdf
 │   └── NF_004_Equipamentos_Laboratorio.pdf
-├── .env                            # Variáveis de ambiente reais (não versionadas)
-├── .env.example                    # Modelo de configuração sem credenciais
-├── setup_supabase_pgvector.sql     # Script SQL para habilitar pgvector e criar a tabela/função RPC
-├── test_connection.py              # Teste isolado de sanidade de conexão
-├── init_supabase.py                # Verificador de status do Supabase
-├── generate_invoices.py            # Gerador dos 4 PDFs fiscais fictícios
-├── data_pipeline.py                # Pipeline OCR, FastEmbed e busca vetorial
-├── backend.py                      # Backend FastAPI com rotas assíncronas
-├── app.py                          # Frontend Streamlit temático Halloween
-└── README.md                       # Documentação da aplicação
+├── .env.example                      # Template seguro para as variáveis de ambiente
+├── .gitignore                        # Proteção de credenciais, venv, caches e temporários
+├── requirements.txt                  # Lista completa de dependências congeladas (UTF-8)
+├── setup_supabase_pgvector.sql       # Script DDL (extensão vector, tabela, HNSW e RPC)
+├── test_connection.py                # Teste isolado de sanidade (Supabase + OpenRouter)
+├── init_supabase.py                  # Script de verificação da tabela no Supabase
+├── generate_invoices.py              # Gerador dos PDFs fiscais fictícios
+├── data_pipeline.py                  # Pipeline OCR, FastEmbed e busca vetorial
+├── backend.py                        # Backend assíncrono em FastAPI
+├── app.py                            # Frontend Streamlit (Página A: Ingestão / Página B: Chat)
+└── README.md                         # Documentação completa
 ```
 
 ---
 
-## 🚀 Como Executar o Projeto
+## 🚀 Instalação e Execução
 
-### 1. Ativação do Ambiente Virtual
-```powershell
-.\venv\Scripts\Activate.ps1
+### 1. Clonar o Repositório
+```bash
+git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
+cd Rag
 ```
 
-### 2. Teste de Sanidade de Conectividade
-Antes de rodar a aplicação, execute o teste isolado:
-```powershell
+### 2. Criar e Ativar o Ambiente Virtual (`venv`)
+- **No Windows (PowerShell):**
+  ```powershell
+  python -m venv venv
+  .\venv\Scripts\Activate.ps1
+  ```
+- **No Linux / macOS:**
+  ```bash
+  python3 -m venv venv
+  source venv/bin/activate
+  ```
+
+### 3. Instalar as Dependências
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configurar as Variáveis de Ambiente
+Copie o arquivo `.env.example` para `.env`:
+```bash
+cp .env.example .env
+```
+Preencha o `.env` com suas chaves:
+```env
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_sua_chave_aqui
+OPENROUTER_API_KEY=sk-or-v1-sua_chave_aqui
+OPENROUTER_MODEL=openrouter/auto
+```
+
+### 5. Executar o Teste de Sanidade
+Antes de iniciar a aplicação, valide a conectividade com as APIs:
+```bash
 python test_connection.py
 ```
 
-### 3. Configuração do Supabase (PGVector)
-Para persistir os vetores no banco remoto:
-1. Acesse o painel do Supabase do seu projeto.
-2. Abra o **SQL Editor**.
-3. Copie o conteúdo de `setup_supabase_pgvector.sql`, cole no editor e clique em **RUN**.
-4. Teste a prontidão rodando:
-   ```powershell
+### 6. Configurar o Supabase (PGVector)
+1. Acesse o **SQL Editor** no painel do seu projeto Supabase.
+2. Copie e execute o conteúdo do arquivo [setup_supabase_pgvector.sql](setup_supabase_pgvector.sql).
+3. Verifique o status com:
+   ```bash
    python init_supabase.py
    ```
 
-### 4. Inicialização do Backend (FastAPI)
-```powershell
+### 7. Iniciar o Backend (FastAPI)
+```bash
 uvicorn backend:app --host 127.0.0.1 --port 8000 --reload
 ```
-Acesse a documentação interativa em: `http://127.0.0.1:8000/docs`
+Acesse a documentação interativa: **[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)**
 
-### 5. Inicialização do Frontend (Streamlit)
-Em outro terminal:
-```powershell
+### 8. Iniciar o Frontend (Streamlit)
+Em outro terminal com o `venv` ativo:
+```bash
 streamlit run app.py
 ```
-Acesse a interface no navegador: `http://localhost:8501`
+Acesse a interface no navegador: **[http://localhost:8501](http://localhost:8501)**
 
 ---
 
 ## 🛡️ Regra Antialucinação Estrita
-Se o usuário fizer perguntas que não possuem respaldo documental nos fragmentos recuperados (ex: *"Qual o valor da passagem aérea para Paris?"*), o sistema intercepta e retorna estritamente:
-> **"Sem dados disponíveis na base"**
+
+O sistema possui diretivas estritas de integridade documental:
+- Caso o usuário faça perguntas sobre produtos, pessoas ou termos que **não constem literalmente na base** (por exemplo: termos aproximados, apelidos ou entidades inexistentes), o modelo **não faz deduções ou suposições**.
+- A resposta é padronizada rigorosamente como:
+  > **`não possuo essa informação na base de dados`**
+
+---
+
+## 👥 Autoria e Licença
+Desenvolvido para fins educacionais e didáticos no ecossistema de Inteligência Artificial e RAG.  
+Distribuído sob a licença MIT.
