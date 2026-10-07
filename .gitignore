@@ -1,0 +1,35 @@
+# Ambientes Virtuais
+venv/
+env/
+ENV/
+.venv/
+
+# Variáveis de Ambiente e Segredos (NUNCA SUBIR PARA O GIT)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Bytecode do Python e Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Streamlit e Configurações de IDE
+.streamlit/secrets.toml
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Dados temporários de upload e cache de embeddings
+uploaded_pdfs/
+chunks_cache.json
+*.log
+
+# SO
+.DS_Store
+Thumbs.db

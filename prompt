@@ -1,0 +1,53 @@
+### INSTRUÇÃO (A AÇÃO CENTRAL)
+Aja como um Engenheiro de Software Sênior e Especialista em Arquitetura de Dados com foco em Inteligência Artificial e sistemas RAG (Retrieval-Augmented Generation).
+
+---
+
+### CONTEXTO (O CENÁRIO DE FUNDO)
+O objetivo é desenvolver uma aplicação RAG didática e visual para fins educacionais, permitindo que o usuário compreenda de ponta a ponta o fluxo de processamento de dados. 
+As definições de ambiente e a stack tecnológica estão detalhadas na tag `<dados>AMBIENTE.txt</dados>`. O banco de dados centralizado é o **Supabase** (com extensão `pgvector`). Toda a configuração e chaves de acesso devem ser consumidas estritamente a partir de um arquivo `.env`, garantindo que nenhuma credencial seja exposta no código-fonte.
+
+---
+
+### REQUISITOS TÉCNICOS & FLUXO DE DESENVOLVIMENTO
+Você deve executar o projeto seguindo rigorosamente a ordem de etapas abaixo:
+
+#### 1. Backend, Conectividade e Segurança (FastAPI / Flask)
+*   **Teste de Sanidade:** Antes de criar as rotas de negócio, desenvolva um script isolado de teste de conectividade com o Supabase. Avance para a construção do backend apenas se a conexão for bem-sucedida.
+*   **Variáveis de Ambiente:** Ao criar os scripts de conexão, **nunca escreva valores de chaves diretamente (hardcoded)**. Chame apenas as variáveis de ambiente mapeadas via `.env` (ex: `os.getenv("SUPABASE_KEY")`, `OPENROUTER_API_KEY`).
+*   **Integração:** Conecte o Frontend em Streamlit ao Backend utilizando chamadas de API assíncronas e bem estruturadas.
+
+#### 2. Processamento de Documentos local e OCR
+*   **Dados de Teste:** Simule a criação local de **4 documentos PDF fictícios representando Notas Fiscais**.
+*   **Pipeline de OCR:** Utilize bibliotecas Python eficazes (como `PyPDF2`, `pdfplumber` ou `pytesseract`) para extrair o texto, capturar os campos estruturados e transformá-los em um formato tabular (Dataframe/Dicionário).
+*   **FastEmbed:** Para a geração de embeddings, utilize obrigatoriamente a biblioteca `fastembed` (com modelos do Sentence Transformers).
+
+#### 3. Banco de Dados Vetorial Remoto (Supabase + PGVector)
+*   Crie um script para gerar a tabela estruturada e vetorizada no banco remoto do Supabase utilizando a extensão **PGVECTOR**.
+*   Faça o upload dos chunks processados e de seus respectivos vetores gerados pelo `fastembed` para essa tabela.
+
+#### 4. Frontend e Interface do Usuário com Streamlit
+A interface web desenvolvida em **Streamlit** deve ser limpa, funcional, responsiva e exibir de forma dinâmica e didática o pipeline do RAG. Utilize os recursos nativos do Streamlit para dividir a aplicação em duas visões principais (ex: usando `st.tabs` ou uma barra lateral de navegação `st.sidebar`):
+
+*   **Página A: Painel de Ingestão de Dados**
+    *   Deve conter um componente de upload ou botão para selecionar a base de dados (os PDFs locais).
+    *   Exibir de forma visual (usando `st.status` ou barras de progresso dinâmicas) o avanço do pipeline: 
+        `INGESTÃO ➔ CHUNKING ➔ TOKENIZAÇÃO ➔ EMBEDDING ➔ ÍNDICE VETORIAL`.
+*   **Página B: Painel de Consulta (Ambiente Chat)**
+    *   Interface no estilo "ChatGPT" utilizando os componentes nativos `st.chat_input` e `st.chat_message` para interação fluida.
+    *   Exibir de forma dinâmica os logs ou loaders indicando o fluxo interno após o envio da pergunta:
+        `PERGUNTA ➔ TOKENIZAÇÃO ➔ EMBEDDING ➔ RETRIEVAL ➔ PROMPT AUMENTADO ➔ LLM via OpenRouter`.
+    *   Exibir os resultados do Retrieval formatados na tela (ex: usando `st.expander`), trazendo o **top_k=5** fragmentos mais relevantes acompanhados de seus respectivos **scores de similaridade**.
+
+#### 5. Regras de Negócio da LLM e Tratamento de Exceções
+*   Se o Retrieval retornar documentos válidos, monte o prompt aumentado e envie para a LLM via OpenRouter.
+*   **Regra Antialucinação Estrita:** Caso o Retrieval não encontre candidatos que atendam à pergunta no banco de dados, o sistema **não deve inventar nenhuma informação**. A resposta final em tela deve ser estritamente: `"Sem dados disponíveis na base"`.
+
+#### 6. Identidade Visual e Temática (Halloween + Mascote)
+*   **Logotipo e Mascote:** Crie uma identidade visual/layout baseada no conceito **"Rag + Gabi"**. O visual deve ser "fofinho", incluindo imagens de gatinhos engraçados/fofos combinados com o elemento de fundo do "machado da lizzie border".
+*   **Tema de Fundo:** Injete CSS customizado no Streamlit (via `st.markdown(..., unsafe_allow_html=True)`) para customizar o tema. O design deve seguir uma estética temática de **Halloween** (tons escuros, roxo, laranja neon), garantindo contraste e perfeita legibilidade para os textos do chat.
+
+---
+
+### EXEMPLO DE SAÍDA ESPERADA
+Forneça a estrutura completa de arquivos do projeto, o código do arquivo de conexão `.env.example`, o script de teste de conectividade, o pipeline de OCR + Vetorização, o arquivo principal do backend e o arquivo `app.py` do Streamlit contendo as regras de interface e injeção de estilo descritas.
