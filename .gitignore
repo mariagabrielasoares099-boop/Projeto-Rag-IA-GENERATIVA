@@ -1,35 +1,107 @@
-# Ambientes Virtuais
+# ==============================================================================
+# .gitignore - Projeto RAG Educacional (Rag + Gabi)
+# Bloqueio de arquivos temporários, caches, ambientes e credenciais sensíveis
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. SEGURANÇA E VARIÁVEIS DE AMBIENTE (CRÍTICO: NUNCA SUBIR AO GITHUB)
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+secrets.json
+
+# ------------------------------------------------------------------------------
+# 2. AMBIENTES VIRTUAIS PYTHON
+# ------------------------------------------------------------------------------
 venv/
+.venv/
 env/
 ENV/
-.venv/
+env.bak/
+venv.bak/
+bin/
+lib/
+include/
 
-# Variáveis de Ambiente e Segredos (NUNCA SUBIR PARA O GIT)
-.env
-.env.local
-.env.*.local
-!.env.example
-
-# Bytecode do Python e Caches
+# ------------------------------------------------------------------------------
+# 3. BYTECODE, CACHES E COMPILAÇÃO PYTHON
+# ------------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.pytest_cache/
-.mypy_cache/
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Streamlit e Configurações de IDE
-.streamlit/secrets.toml
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
+# ------------------------------------------------------------------------------
+# 4. CACHES DE MODELOS, EMBEDDINGS E IA (FASTEMBED / ONNX / HUGGING FACE)
+# ------------------------------------------------------------------------------
+fastembed_cache/
+.cache/
+huggingface/
+*.onnx
+*.bin
+*.safetensors
+*.pt
+*.pth
 
-# Dados temporários de upload e cache de embeddings
+# ------------------------------------------------------------------------------
+# 5. DADOS TEMPORÁRIOS, UPLOADS E LOGS DA APLICAÇÃO
+# ------------------------------------------------------------------------------
 uploaded_pdfs/
 chunks_cache.json
 *.log
+logs/
+*.sqlite3
+*.db
+temp/
+tmp/
 
-# SO
+# ------------------------------------------------------------------------------
+# 6. CONFIGURAÇÕES LOCAIS DE IDES E EDITORES
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.agents/
+.gemini/
+*.sublime-project
+*.sublime-workspace
+
+# ------------------------------------------------------------------------------
+# 7. ARQUIVOS DO SISTEMA OPERACIONAL
+# ------------------------------------------------------------------------------
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
+
+# ------------------------------------------------------------------------------
+# 8. TESTES E COBERTURA
+# ------------------------------------------------------------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
