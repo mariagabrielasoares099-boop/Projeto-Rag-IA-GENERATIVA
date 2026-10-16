@@ -30,7 +30,7 @@ invoices_data = [
             ("3", "Petisco Sabor Abóbora Encantada 500g", "1 UN", "R$ 45,00", "R$ 45,00")
         ],
         "total": "R$ 475,00",
-        "observacoes": "Mascote Rag & Gabi aprovado. Entrega expressa para o Halloween."
+        "observacoes": "Mascote Rag aprovado. Entrega expressa para o Halloween."
     },
     {
         "filename": "NF_002_Servicos_Tech_Rag.pdf",
@@ -39,7 +39,7 @@ invoices_data = [
         "data_emissao": "20/10/2026",
         "chave_acesso": "35261098765432000121550010000000029876543210",
         "emitente": {
-            "razao_social": "Rag & Gabi Soluções de Inteligência Artificial Ltda",
+            "razao_social": "Rag Soluções de Inteligência Artificial Ltda",
             "cnpj": "98.765.432/0001-21",
             "endereco": "Alameda dos Algoritmos, 500 - Bloco B - Campinas/SP"
         },
@@ -91,7 +91,7 @@ invoices_data = [
             "endereco": "Rodovia da Tecnologia, KM 12 - Florianópolis/SC"
         },
         "destinatario": {
-            "nome": "Laboratório de IA Rag & Gabi",
+            "nome": "Laboratório de IA Rag",
             "cpf": "98.765.432/0001-21",
             "endereco": "Alameda dos Algoritmos, 500 - Campinas/SP"
         },

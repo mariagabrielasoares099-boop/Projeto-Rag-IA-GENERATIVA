@@ -1,7 +1,7 @@
-# 🎃 Rag + Gabi | Aplicação RAG Didática e Visual (Halloween Edition)
+# 🎃 RAG Halloween Edition | Aplicação RAG Didática e Visual
 
 <p align="center">
-  <img src="assets/rag_gabi_mascot.jpg" alt="Mascote Rag + Gabi" width="360" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(255, 110, 20, 0.4);" />
+  <img src="assets/rag_mascot.jpg" alt="Mascote RAG Halloween Edition" width="360" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(255, 110, 20, 0.4);" />
 </p>
 
 <p align="center">
@@ -16,14 +16,14 @@
 ---
 
 ## 📖 Visão Geral do Projeto
-O **Rag + Gabi** é uma aplicação educacional desenvolvida para demonstrar de ponta a ponta o funcionamento de uma arquitetura **RAG (Retrieval-Augmented Generation)**. 
+O **RAG Halloween Edition** é uma aplicação educacional desenvolvida para demonstrar de ponta a ponta o funcionamento de uma arquitetura **RAG (Retrieval-Augmented Generation)**. 
 
 O sistema processa Notas Fiscais (DANFE) em PDF, extrai dados estruturados em formato tabular, divide os textos em chunks semânticos, gera representações vetoriais densas de 384 dimensões via **FastEmbed**, armazena e recupera os dados no banco vetorial remoto **Supabase (pgvector)** e responde via **OpenRouter** com uma **regra estrita antialucinação**.
 
 ---
 
 ## 🎨 Identidade Visual & Temática
-- **Conceito:** Rag + Gabi (Gatinho travesso e fofinho de Halloween com machado cenográfico de Lizzie Borden).
+- **Conceito:** RAG Halloween Edition (Gatinho travesso e fofinho de Halloween com machado cenográfico de Lizzie Borden).
 - **Design:** Tema Dark Glow temático de Halloween (fundo roxo escuro `#120822`, destaque em laranja neon `#ff6e14` e tipografia de alto contraste para máxima legibilidade).
 
 ---
@@ -61,7 +61,7 @@ flowchart TD
 ```
 Rag/
 ├── assets/
-│   └── rag_gabi_mascot.jpg          # Mascote visual do projeto Rag + Gabi
+│   └── rag_mascot.jpg          # Mascote visual do projeto RAG Halloween Edition
 ├── dados_notas_fiscais/              # Base de 4 PDFs de Notas Fiscais fictícias
 │   ├── NF_001_Gatinhos_Petshop.pdf
 │   ├── NF_002_Servicos_Tech_Rag.pdf

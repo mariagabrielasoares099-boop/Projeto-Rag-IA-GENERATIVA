@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- Script de Configuração do Banco Vetorial Remoto (Supabase + PGVector)
--- Projeto: Rag + Gabi (Halloween Edition)
+-- Projeto: RAG Halloween Edition
 -- ==============================================================================
 
 -- 1. Habilita a extensão pgvector para suporte a operações com vetores

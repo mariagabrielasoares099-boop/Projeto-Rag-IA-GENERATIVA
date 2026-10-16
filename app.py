@@ -11,14 +11,14 @@ load_dotenv()
 
 # Configuração da Página
 st.set_page_config(
-    page_title="Rag + Gabi 🎃 | Sistema RAG Educacional",
+    page_title="RAG Halloween Edition 🎃 | Sistema RAG Educacional",
     page_icon="🐱",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
-MASCOT_PATH = os.path.join(os.path.dirname(__file__), "assets", "rag_gabi_mascot.jpg")
+MASCOT_PATH = os.path.join(os.path.dirname(__file__), "assets", "rag_mascot.jpg")
 
 # --- CSS Customizado: Tema Halloween + Neon Dark ---
 CUSTOM_CSS = """
@@ -149,7 +149,7 @@ CUSTOM_CSS = """
         font-size: 15.5px !important;
     }
 
-    /* Balão do Assistente (Mascote Rag + Gabi) - Texto em branco nítido */
+    /* Balão do Assistente (Mascote RAG Halloween Edition) - Texto em branco nítido */
     div[data-testid="stChatMessage"]:has(div[data-testid="chatAvatarIcon-assistant"]) {
         background: linear-gradient(135deg, #24113b 0%, #150826 100%) !important;
         border-left: 6px solid #ff7714 !important;
@@ -312,7 +312,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Olá! Eu sou o mascote **Rag + Gabi** 🐱🎃! "
+            "content": "Olá! Eu sou o mascote **RAG Halloween Edition** 🐱🎃! "
                        "Estou pronto para navegar nas Notas Fiscais indexadas no **Supabase PGVector** com embeddings do **FastEmbed**. "
                        "Faça perguntas sobre produtos, valores ou emitentes!",
             "retrieved_docs": []
@@ -325,9 +325,9 @@ if "indexed_data" not in st.session_state:
 # --- Barra Lateral (Sidebar) ---
 with st.sidebar:
     if os.path.exists(MASCOT_PATH):
-        st.image(MASCOT_PATH, use_container_width=True, caption="Rag + Gabi 🐱🪓 Machado de Lizzie Borden")
+        st.image(MASCOT_PATH, use_container_width=True, caption="RAG Halloween Edition 🐱🪓 Machado de Lizzie Borden")
     else:
-        st.header("🐱 Rag + Gabi")
+        st.header("🐱 RAG Halloween Edition")
 
     st.markdown("### 🎃 Painel de Controle")
     st.markdown("""
@@ -376,7 +376,7 @@ with col_logo:
 with col_title:
     st.markdown("""
     <div class="top-orange-box">
-        <h1 style="margin: 0; color: #ffffff !important; font-size: 2.2rem; text-shadow: 0 2px 8px rgba(0,0,0,0.35);">🎃 Rag + Gabi | RAG Educacional</h1>
+        <h1 style="margin: 0; color: #ffffff !important; font-size: 2.2rem; text-shadow: 0 2px 8px rgba(0,0,0,0.35);">🎃 RAG Halloween Edition | RAG Educacional</h1>
         <p style="margin-top: 6px; margin-bottom: 0; color: #fff5ed !important; font-size: 15px;">
             <span class="halloween-badge" style="background-color: #200c36; color: #ffa05c; border: 1px solid #ffa05c;">HALLOWEEN SPECIAL</span>
             Pipeline Visual de Ingestão de Notas Fiscais, Supabase PGVector, FastEmbed & LLM Antialucinação

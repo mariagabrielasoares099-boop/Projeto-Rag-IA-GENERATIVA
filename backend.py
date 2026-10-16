@@ -11,7 +11,7 @@ from data_pipeline import DocumentProcessor, OUTPUT_DIR
 load_dotenv()
 
 app = FastAPI(
-    title="Rag + Gabi - API Backend RAG Educacional",
+    title="RAG Halloween Edition - API Backend RAG Educacional",
     description="Backend em FastAPI com FastEmbed, Supabase PGVector e OpenRouter",
     version="1.0.0"
 )
@@ -231,7 +231,7 @@ async def chat_rag(request: ChatRequest):
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
         "HTTP-Referer": "http://localhost:8501",
-        "X-Title": "Rag + Gabi Education RAG"
+        "X-Title": "RAG Halloween Edition Education RAG"
     }
 
     payload = {
