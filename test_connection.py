@@ -48,7 +48,7 @@ def test_openrouter_connection():
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "HTTP-Referer": "http://localhost:8501",
-            "X-Title": "Rag + Gabi Test"
+            "X-Title": "RAG Halloween Edition Test"
         }
         resp = httpx.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=10.0)
         if resp.status_code == 200:
