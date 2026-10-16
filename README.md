@@ -1,7 +1,7 @@
 # 🎃 RAG Halloween Edition | Aplicação RAG Didática e Visual
 
 <p align="center">
-  <img src="assets/rag_gabi_mascot.jpg" alt="Mascote RAG Halloween Edition" width="360" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(255, 110, 20, 0.4);" />
+  <img src="assets/rag_mascot.jpg" alt="Mascote RAG Halloween Edition" width="360" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(255, 110, 20, 0.4);" />
 </p>
 
 <p align="center">
@@ -61,7 +61,7 @@ flowchart TD
 ```
 Rag/
 ├── assets/
-│   └── rag_gabi_mascot.jpg          # Mascote visual do projeto RAG Halloween Edition
+│   └── rag_mascot.jpg          # Mascote visual do projeto RAG Halloween Edition
 ├── dados_notas_fiscais/              # Base de 4 PDFs de Notas Fiscais fictícias
 │   ├── NF_001_Gatinhos_Petshop.pdf
 │   ├── NF_002_Servicos_Tech_Rag.pdf

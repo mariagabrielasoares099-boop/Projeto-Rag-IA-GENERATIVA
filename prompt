@@ -44,7 +44,7 @@ A interface web desenvolvida em **Streamlit** deve ser limpa, funcional, respons
 *   **Regra Antialucinação Estrita:** Caso o Retrieval não encontre candidatos que atendam à pergunta no banco de dados, o sistema **não deve inventar nenhuma informação**. A resposta final em tela deve ser estritamente: `"Sem dados disponíveis na base"`.
 
 #### 6. Identidade Visual e Temática (Halloween + Mascote)
-*   **Logotipo e Mascote:** Crie uma identidade visual/layout baseada no conceito **"Rag + Gabi"**. O visual deve ser "fofinho", incluindo imagens de gatinhos engraçados/fofos combinados com o elemento de fundo do "machado da lizzie border".
+*   **Logotipo e Mascote:** Crie uma identidade visual/layout baseada no conceito **"Rag"**. O visual deve ser "fofinho", incluindo imagens de gatinhos engraçados/fofos combinados com o elemento de fundo do "machado da lizzie border".
 *   **Tema de Fundo:** Injete CSS customizado no Streamlit (via `st.markdown(..., unsafe_allow_html=True)`) para customizar o tema. O design deve seguir uma estética temática de **Halloween** (tons escuros, roxo, laranja neon), garantindo contraste e perfeita legibilidade para os textos do chat.
 
 ---

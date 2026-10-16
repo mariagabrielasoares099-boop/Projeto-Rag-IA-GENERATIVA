@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
-MASCOT_PATH = os.path.join(os.path.dirname(__file__), "assets", "rag_gabi_mascot.jpg")
+MASCOT_PATH = os.path.join(os.path.dirname(__file__), "assets", "rag_mascot.jpg")
 
 # --- CSS Customizado: Tema Halloween + Neon Dark ---
 CUSTOM_CSS = """
