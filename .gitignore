@@ -105,3 +105,6 @@ desktop.ini
 .coverage
 htmlcov/
 .mypy_cache/
+
+# Streamlit secrets
+.streamlit/secrets.toml

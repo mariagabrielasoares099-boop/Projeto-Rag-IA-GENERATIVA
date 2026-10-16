@@ -18,6 +18,31 @@ st.set_page_config(
 )
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+
+
+@st.cache_resource(show_spinner="🎃 Iniciando o backend RAG...")
+def start_embedded_backend():
+    """Sobe o backend FastAPI no mesmo processo (ex.: Streamlit Community Cloud)."""
+    import threading
+    import uvicorn
+    from backend import app as fastapi_app
+
+    server = uvicorn.Server(uvicorn.Config(fastapi_app, host="127.0.0.1", port=8000, log_level="warning"))
+    threading.Thread(target=server.run, daemon=True).start()
+    for _ in range(60):
+        if server.started:
+            break
+        time.sleep(0.5)
+    return server
+
+
+# Sem BACKEND_URL externo, inicia o backend junto com o app (se ainda não estiver no ar)
+if not os.getenv("BACKEND_URL"):
+    try:
+        requests.get(f"{BACKEND_URL}/api/health", timeout=1.0)
+    except requests.exceptions.RequestException:
+        start_embedded_backend()
+
 MASCOT_PATH = os.path.join(os.path.dirname(__file__), "assets", "rag_mascot.jpg")
 
 # --- CSS Customizado: Tema Halloween + Neon Dark ---
