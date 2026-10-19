@@ -1,0 +1,15 @@
+{
+  "name": "projeto-rag-ia-generativa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Projeto RAG com backend FastAPI e frontend Streamlit",
+  "scripts": {
+    "backend": "cmd /c \"\"C:\\Program Files\\Python313\\python.exe\" -m uvicorn backend:app --host 127.0.0.1 --port 8000 --reload\"",
+    "frontend": "cmd /c \"\"C:\\Program Files\\Python313\\python.exe\" -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501\"",
+    "start": "npm run backend",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
