@@ -1,0 +1,42 @@
+# Sobe o RAG (backend FastAPI), o servidor MCP e o n8n.
+#   docker compose up -d --build
+# n8n: http://localhost:5678  |  backend: http://localhost:8000/docs  |  MCP: http://localhost:8001/mcp
+services:
+  rag-backend:
+    build: .
+    image: rag-notas-fiscais:latest
+    env_file: .env
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      retries: 12
+
+  rag-mcp:
+    image: rag-notas-fiscais:latest
+    command: ["python", "mcp_server.py"]
+    environment:
+      RAG_BACKEND_URL: http://rag-backend:8000
+    ports:
+      - "8001:8001"
+    depends_on:
+      rag-backend:
+        condition: service_healthy
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      TZ: America/Sao_Paulo
+      N8N_SECURE_COOKIE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/import:ro
+    depends_on:
+      - rag-mcp
+
+volumes:
+  n8n_data:
