@@ -78,16 +78,21 @@ def rank_hybrid(query: str, candidates: List[Dict[str, Any]], top_k: int, match_
     """
     Reordena candidatos vetoriais combinando a similaridade de cosseno com um score lexical
     ponderado por IDF (Reciprocal Rank Fusion). Um candidato é aceito se passar no threshold
-    vetorial OU se cobrir a maior parte dos termos da pergunta (nomes, CNPJ, nº da nota).
+    vetorial OU se cobrir a maior parte dos termos da pergunta que existem na base (nomes, CNPJ,
+    nº da nota).
     """
     terms = set(lexical_terms(query))
     chunk_terms = [set(lexical_terms(c["content"])) for c in candidates]
     n = len(candidates)
-    # Termo que não aparece em nenhum candidato pesa mais: "gatinha" ausente derruba o score
+    # Só contam os termos que aparecem em algum candidato. Palavra da pergunta que não está em
+    # documento nenhum ("cidade", "fica") não diz qual trecho é o certo; se for uma entidade
+    # inexistente ("gatinha"), quem recusa é a regra antialucinação da LLM.
     idf = {}
     for t in terms:
         df = sum(t in ct for ct in chunk_terms)
-        idf[t] = math.log(1 + (n - df + 0.5) / (df + 0.5))
+        if df:
+            idf[t] = math.log(1 + (n - df + 0.5) / (df + 0.5))
+    terms = set(idf)
     total_weight = sum(idf.values())
 
     for c, ct in zip(candidates, chunk_terms):
