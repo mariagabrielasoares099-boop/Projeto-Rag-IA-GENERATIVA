@@ -35,16 +35,16 @@ flowchart TD
     subgraph Ingestao ["1. Painel de Ingestão de Dados (Página A)"]
         A[PDFs de Notas Fiscais] --> B[Extração OCR / Texto com pypdf]
         B --> C[Estruturação Tabular Dataframe]
-        C --> D[Chunking Semântico com Metadados]
+        C --> D[Chunking: resumo + partes + trechos de 300 caracteres com sobreposição]
         D --> E[Tokenização Sentence Transformers]
-        E --> F[FastEmbed Embeddings 384 dims]
+        E --> F[FastEmbed multilíngue 384 dims]
         F --> G[(Supabase PGVector)]
     end
 
     subgraph Chat ["2. Painel de Consulta RAG (Página B)"]
         H[Pergunta do Usuário] --> I[Tokenização da Query]
         I --> J[FastEmbed Query Vector]
-        J --> K[Retrieval Cosine Similarity top_k=5]
+        J --> K[Retrieval Híbrido: cosseno + termos exatos, RRF, top_k=5]
         G -.-> K
         K --> L{Entidade ou dado existe na base?}
         L -- Não / Divergente --> M["'não possuo essa informação na base de dados'"]
@@ -74,7 +74,9 @@ Rag/
 ├── test_connection.py                # Teste isolado de sanidade (Supabase + OpenRouter)
 ├── init_supabase.py                  # Script de verificação da tabela no Supabase
 ├── generate_invoices.py              # Gerador dos PDFs fiscais fictícios
-├── data_pipeline.py                  # Pipeline OCR, FastEmbed e busca vetorial
+├── data_pipeline.py                  # Pipeline OCR, FastEmbed e busca híbrida (vetorial + lexical)
+├── rag_prompt.py                     # Prompt aumentado e regra antialucinação (backend e app)
+├── avaliar_retrieval.py              # Avaliação do retrieval (hit@1 e hit@5, vetorial x híbrida)
 ├── backend.py                        # Backend assíncrono em FastAPI
 ├── app.py                            # Frontend Streamlit (Página A: Ingestão / Página B: Chat)
 └── README.md                         # Documentação completa
@@ -205,6 +207,15 @@ Quando terminar de utilizar ou testar o projeto, desative o ambiente virtual rod
 ```bash
 deactivate
 ```
+
+---
+
+## 🔎 Como o Retrieval Funciona
+
+- **Embedding multilíngue:** `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dimensões), porque as notas e as perguntas estão em português. Dá para trocar pela variável `EMBEDDING_MODEL` do `.env`. Ao trocar o modelo, rode a ingestão de novo.
+- **Chunking:** cada nota vira um resumo do cabeçalho, um chunk de partes e observações, e o texto integral em trechos de até 300 caracteres com 80 de sobreposição. Antes era um chunk só com o PDF inteiro: o vetor misturava cabeçalho, partes e itens, e o modelo multilíngue lê no máximo 128 tokens.
+- **Busca híbrida:** o Supabase devolve os candidatos mais próximos por cosseno. Eles são reordenados por *Reciprocal Rank Fusion* com um score lexical ponderado por IDF, que favorece nomes, CNPJs e números de nota escritos igual. Um trecho entra no contexto se tiver cosseno >= threshold **ou** se cobrir a maior parte dos termos da pergunta.
+- **Avaliação:** `python avaliar_retrieval.py` mostra hit@1 e hit@5 da busca só vetorial e da híbrida, sem gastar chamadas de LLM.
 
 ---
 

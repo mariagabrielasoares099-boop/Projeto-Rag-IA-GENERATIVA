@@ -7,6 +7,7 @@ import httpx
 from dotenv import load_dotenv
 
 from data_pipeline import DocumentProcessor, OUTPUT_DIR
+from rag_prompt import NO_DATA_ANSWER, build_messages, is_no_data_answer
 
 load_dotenv()
 
@@ -46,6 +47,8 @@ class RetrievedChunk(BaseModel):
     content: str
     metadata: Dict[str, Any]
     similarity: float
+    lexical_score: float = 0.0
+    hybrid_score: float = 0.0
 
 class RetrieveResponse(BaseModel):
     query: str
@@ -65,6 +68,17 @@ class ChatResponse(BaseModel):
     pipeline_steps: List[str]
     has_relevant_data: bool
     execution_time_ms: float
+
+def to_retrieved_chunk(r: Dict[str, Any]) -> RetrievedChunk:
+    return RetrievedChunk(
+        document_name=r["document_name"],
+        chunk_index=r["chunk_index"],
+        content=r["content"],
+        metadata=r.get("metadata", {}),
+        similarity=r["similarity"],
+        lexical_score=r.get("lexical_score", 0.0),
+        hybrid_score=r.get("hybrid_score", 0.0)
+    )
 
 # --- Rotas do Backend ---
 
@@ -99,9 +113,10 @@ async def ingest_documents(request: IngestRequest):
     
     # Processa PDFs e extrai estrutura tabular
     df, chunks = processor.process_directory(target_dir)
+    embedding_dim = len(chunks[0]["embedding"]) if chunks else 0
     steps.append(f"2. CHUNKING: Gerados {len(chunks)} fragmentos semânticos estruturados a partir de {len(df)} notas fiscais")
     steps.append("3. TOKENIZAÇÃO: Textos tokenizados com Sentence Transformers")
-    steps.append(f"4. EMBEDDING: Gerados vetores densos de 384 dimensões via FastEmbed ({processor.model_name})")
+    steps.append(f"4. EMBEDDING: Gerados vetores densos de {embedding_dim} dimensões via FastEmbed ({processor.model_name})")
 
     # Upload para o Supabase PGVector
     upload_status = processor.upload_to_supabase(chunks)
@@ -114,7 +129,7 @@ async def ingest_documents(request: IngestRequest):
         success=True,
         total_documents=len(df),
         total_chunks=len(chunks),
-        embedding_dimension=384,
+        embedding_dimension=embedding_dim,
         documents_table=df.to_dict(orient="records"),
         supabase_status=upload_status,
         pipeline_steps=steps
@@ -133,16 +148,7 @@ async def retrieve_chunks(request: RetrieveRequest):
     )
     elapsed_ms = (time.time() - start_time) * 1000
 
-    chunks = [
-        RetrievedChunk(
-            document_name=r["document_name"],
-            chunk_index=r["chunk_index"],
-            content=r["content"],
-            metadata=r.get("metadata", {}),
-            similarity=r["similarity"]
-        )
-        for r in raw_results
-    ]
+    chunks = [to_retrieved_chunk(r) for r in raw_results]
 
     return RetrieveResponse(
         query=request.query,
@@ -171,18 +177,9 @@ async def chat_rag(request: ChatRequest):
         match_threshold=request.threshold
     )
 
-    chunks = [
-        RetrievedChunk(
-            document_name=r["document_name"],
-            chunk_index=r["chunk_index"],
-            content=r["content"],
-            metadata=r.get("metadata", {}),
-            similarity=r["similarity"]
-        )
-        for r in retrieved
-    ]
+    chunks = [to_retrieved_chunk(r) for r in retrieved]
 
-    steps.append(f"4. RETRIEVAL: {len(chunks)} fragmentos recuperados com score >= {request.threshold}")
+    steps.append(f"4. RETRIEVAL HÍBRIDO: {len(chunks)} fragmentos (cosseno >= {request.threshold} ou termos exatos da pergunta), ordenados por RRF")
 
     # REGRA ANTIALUCINAÇÃO ESTRITA
     # Se o retrieval não retornar candidatos ou se estiver vazio
@@ -192,7 +189,7 @@ async def chat_rag(request: ChatRequest):
         elapsed_ms = (time.time() - start_time) * 1000
         return ChatResponse(
             query=request.query,
-            answer="não possuo essa informação na base de dados",
+            answer=NO_DATA_ANSWER,
             retrieved_documents=[],
             pipeline_steps=steps,
             has_relevant_data=False,
@@ -200,26 +197,7 @@ async def chat_rag(request: ChatRequest):
         )
 
     # Monta Contexto Aumentado
-    context_str = "\n\n---\n\n".join([
-        f"[Documento: {c.document_name} | Chunk {c.chunk_index} | Similaridade: {c.similarity:.2f}]\n{c.content}"
-        for c in chunks
-    ])
-
     steps.append("5. PROMPT AUMENTADO: Contexto concatenado e injetado com diretivas antialucinação")
-
-    system_prompt = (
-        "Você é o assistente técnico de consulta de Notas Fiscais do sistema RAG.\n"
-        "Sua função é responder à pergunta do usuário utilizando ESTRITAMENTE as informações literais e explícitas contidas no CONTEXTO fornecido.\n\n"
-        "DIRETRIZES INEGOCIÁVEIS:\n"
-        "1. Responda APENAS quando a informação solicitada e as entidades mencionadas (nomes de pessoas, empresas, produtos) constarem de forma literal, inequívoca e explícita no contexto.\n"
-        "2. NUNCA faça deduções, suposições, aproximações semânticas ou tentativas de adivinhação. Se o usuário perguntar por um nome, apelido, termo ou entidade que não exista exatamente no contexto (por exemplo, perguntar por 'gatinha' quando a base tem apenas 'Pet Shop Gatinho Mágico' para 'Gabriela Almeida', ou qualquer outro termo divergente), você NÃO deve associar ou assumir que é a mesma coisa.\n"
-        "3. Em QUALQUER caso onde a informação exata solicitada não conste explicitamente na base de dados, sua resposta DEVE SER EXATAMENTE:\n"
-        "\"não possuo essa informação na base de dados\"\n"
-        "4. Quando a informação não existir, NÃO adicione saudações, justificativas ou textos adicionais: responda única e exclusivamente: 'não possuo essa informação na base de dados'.\n"
-        "5. Quando a informação solicitada existir comprovadamente na base, forneça uma resposta precisa e objetiva com os dados da nota fiscal."
-    )
-
-    user_content = f"CONTEXTO RECUPERADO DA BASE VETORIAL:\n{context_str}\n\nPERGUNTA DO USUÁRIO:\n{request.query}"
 
     # Chamada assíncrona ao OpenRouter
     steps.append(f"6. LLM via OpenRouter: Enviando requisição para o modelo '{OPENROUTER_MODEL}'")
@@ -236,10 +214,7 @@ async def chat_rag(request: ChatRequest):
 
     payload = {
         "model": OPENROUTER_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content}
-        ],
+        "messages": build_messages(request.query, retrieved),
         "temperature": 0.0
     }
 
@@ -254,6 +229,11 @@ async def chat_rag(request: ChatRequest):
     except Exception as e:
         assistant_answer = f"[!] Falha na comunicação com OpenRouter: {str(e)}"
 
+    # A LLM também pode aplicar a regra antialucinação quando os trechos não respondem à pergunta
+    has_relevant_data = not is_no_data_answer(assistant_answer)
+    if not has_relevant_data:
+        steps.append("7. REGRA ANTIALUCINAÇÃO: A LLM não encontrou a resposta nos trechos recuperados.")
+
     elapsed_ms = (time.time() - start_time) * 1000
 
     return ChatResponse(
@@ -261,7 +241,7 @@ async def chat_rag(request: ChatRequest):
         answer=assistant_answer,
         retrieved_documents=chunks,
         pipeline_steps=steps,
-        has_relevant_data=True,
+        has_relevant_data=has_relevant_data,
         execution_time_ms=round(elapsed_ms, 2)
     )
 
