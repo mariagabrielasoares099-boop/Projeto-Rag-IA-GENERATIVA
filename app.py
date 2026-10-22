@@ -6,6 +6,8 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
+from rag_prompt import NO_DATA_ANSWER, build_messages, is_no_data_answer
+
 # Carrega variáveis de ambiente
 load_dotenv()
 
@@ -583,41 +585,28 @@ with tab_chat:
                     
                     if not docs:
                         chat_data = {
-                            "answer": "não possuo essa informação na base de dados",
+                            "answer": NO_DATA_ANSWER,
                             "retrieved_documents": [],
                             "has_relevant_data": False
                         }
                     else:
-                        # Chama OpenRouter diretamente
+                        # Chama OpenRouter diretamente, com o mesmo prompt do backend
                         openrouter_key = os.getenv("OPENROUTER_API_KEY")
-                        context_str = "\n\n".join([f"[{d['document_name']}]: {d['content']}" for d in docs])
-                        prompt = f"CONTEXTO:\n{context_str}\n\nPERGUNTA: {user_query}"
-                        system = (
-                            "Você é o assistente técnico de consulta de Notas Fiscais do sistema RAG.\n"
-                            "Sua função é responder à pergunta do usuário utilizando ESTRITAMENTE as informações literais e explícitas contidas no CONTEXTO fornecido.\n\n"
-                            "DIRETRIZES INEGOCIÁVEIS:\n"
-                            "1. Responda APENAS quando a informação solicitada e as entidades mencionadas constarem de forma literal, inequívoca e explícita no contexto.\n"
-                            "2. NUNCA faça deduções, suposições, aproximações semânticas ou tentativas de adivinhação. Se o usuário perguntar por um nome, termo ou entidade que não exista exatamente no contexto (por exemplo, perguntar por 'gatinha' quando na base existe 'Pet Shop Gatinho Mágico' para 'Gabriela Almeida'), você NÃO deve associar ou presumir que se trata da mesma coisa.\n"
-                            "3. Em QUALQUER situação onde a informação exata não conste explicitamente na base de dados, sua resposta DEVE SER EXATAMENTE:\n"
-                            "\"não possuo essa informação na base de dados\"\n"
-                            "4. Quando a informação não existir, NÃO adicione saudações, desculpas ou explicações adicionais: responda estritamente: 'não possuo essa informação na base de dados'."
-                        )
-                        
                         r_llm = requests.post(
                             "https://openrouter.ai/api/v1/chat/completions",
                             headers={"Authorization": f"Bearer {openrouter_key}"},
                             json={
                                 "model": os.getenv("OPENROUTER_MODEL", "openrouter/auto"),
-                                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                                "messages": build_messages(user_query, docs),
                                 "temperature": 0.0
                             },
                             timeout=30.0
                         )
-                        ans = r_llm.json()["choices"][0]["message"]["content"] if r_llm.status_code == 200 else "não possuo essa informação na base de dados"
+                        ans = r_llm.json()["choices"][0]["message"]["content"] if r_llm.status_code == 200 else NO_DATA_ANSWER
                         chat_data = {
                             "answer": ans,
                             "retrieved_documents": docs,
-                            "has_relevant_data": True
+                            "has_relevant_data": not is_no_data_answer(ans)
                         }
 
                 chat_status.update(
@@ -627,11 +616,11 @@ with tab_chat:
                 )
 
             # Exibe a resposta final
-            final_answer = chat_data.get("answer", "não possuo essa informação na base de dados")
+            final_answer = chat_data.get("answer", NO_DATA_ANSWER)
             retrieved_items = chat_data.get("retrieved_documents", [])
 
             # Destaque se foi acionada a regra antialucinação
-            if "não possuo essa informação na base de dados" in final_answer.lower() or "sem dados disponíveis" in final_answer.lower():
+            if is_no_data_answer(final_answer) or "sem dados disponíveis" in final_answer.lower():
                 st.warning(f"⚠️ **{final_answer}**")
             else:
                 st.markdown(final_answer)
@@ -643,7 +632,9 @@ with tab_chat:
                         sim_score = doc.get("similarity", 0.0)
                         st.markdown(
                             f"**#{idx} | Nota:** `{doc.get('document_name')}` — "
-                            f"**Similaridade Cosseno:** `{sim_score:.4f}`"
+                            f"**Similaridade Cosseno:** `{sim_score:.4f}` · "
+                            f"**Lexical:** `{doc.get('lexical_score', 0.0):.2f}` · "
+                            f"**Híbrido (RRF):** `{doc.get('hybrid_score', 0.0):.4f}`"
                         )
                         st.info(doc.get("content"))
 

@@ -1,6 +1,9 @@
 import os
 import re
 import json
+import math
+import textwrap
+import unicodedata
 from typing import List, Dict, Any, Tuple
 import pypdf
 import pandas as pd
@@ -14,13 +17,130 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_PUBLISHABLE_KEY")
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "dados_notas_fiscais")
+CACHE_FILE = os.path.join(os.path.dirname(__file__), "chunks_cache.json")
+
+# Modelo multilíngue (as notas e as perguntas são em português). Tem 384 dimensões,
+# então a tabela vector(384) do Supabase continua valendo. Ele lê até 128 tokens,
+# por isso os trechos do texto integral são curtos (CHUNK_MAX_CHARS).
+DEFAULT_EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+CHUNK_MAX_CHARS = 300
+CHUNK_OVERLAP_CHARS = 80
+
+# Busca híbrida: candidatos vetoriais reordenados por RRF com um score lexical
+RRF_K = 60
+LEXICAL_MIN_SCORE = 0.5
+STOPWORDS = {
+    "qual", "quais", "que", "quem", "para", "com", "das", "dos", "uma", "umas", "uns", "nao",
+    "nota", "notas", "fiscal", "fiscais", "valor", "sobre", "foi", "como", "onde", "quando",
+    "esta", "essa", "esse", "este", "pela", "pelo", "tem", "sao", "nas", "nos", "mais", "entre",
+    "item", "itens", "por", "seu", "sua", "meu", "minha",
+}
+
+
+def normalize_text(text: str) -> str:
+    """Minúsculas, sem acentos, e números com separador (CNPJ, nº da nota) juntos num token só."""
+    text = unicodedata.normalize("NFKD", text.lower())
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return re.sub(r"(?<=\d)[.\-/](?=\d)", "", text)
+
+
+def lexical_terms(text: str) -> List[str]:
+    return [t for t in re.findall(r"[a-z0-9]+", normalize_text(text)) if len(t) >= 3 and t not in STOPWORDS]
+
+
+def split_text(text: str, max_chars: int = CHUNK_MAX_CHARS, overlap_chars: int = CHUNK_OVERLAP_CHARS) -> List[str]:
+    """Divide o texto em trechos de até max_chars, quebrando por linha e repetindo o fim do trecho anterior."""
+    lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line:
+            lines.extend(textwrap.wrap(line, max_chars) if len(line) > max_chars else [line])
+
+    pieces: List[str] = []
+    current: List[str] = []
+    for line in lines:
+        if current and len(" ".join(current + [line])) > max_chars:
+            pieces.append("\n".join(current))
+            # Sobreposição: carrega as últimas linhas do trecho anterior que cabem em overlap_chars
+            tail: List[str] = []
+            for prev in reversed(current):
+                if len(" ".join([prev] + tail)) > overlap_chars:
+                    break
+                tail.insert(0, prev)
+            current = tail
+        current.append(line)
+    if current:
+        pieces.append("\n".join(current))
+    return pieces
+
+
+def rank_hybrid(query: str, candidates: List[Dict[str, Any]], top_k: int, match_threshold: float) -> List[Dict[str, Any]]:
+    """
+    Reordena candidatos vetoriais combinando a similaridade de cosseno com um score lexical
+    ponderado por IDF (Reciprocal Rank Fusion). Um candidato é aceito se passar no threshold
+    vetorial OU se cobrir a maior parte dos termos da pergunta que existem na base (nomes, CNPJ,
+    nº da nota).
+    """
+    terms = set(lexical_terms(query))
+    chunk_terms = [set(lexical_terms(c["content"])) for c in candidates]
+    n = len(candidates)
+    # Só contam os termos que aparecem em algum candidato. Palavra da pergunta que não está em
+    # documento nenhum ("cidade", "fica") não diz qual trecho é o certo; se for uma entidade
+    # inexistente ("gatinha"), quem recusa é a regra antialucinação da LLM.
+    idf = {}
+    for t in terms:
+        df = sum(t in ct for ct in chunk_terms)
+        if df:
+            idf[t] = math.log(1 + (n - df + 0.5) / (df + 0.5))
+    terms = set(idf)
+    total_weight = sum(idf.values())
+
+    for c, ct in zip(candidates, chunk_terms):
+        c["lexical_score"] = round(sum(idf[t] for t in terms & ct) / total_weight, 4) if total_weight else 0.0
+
+    by_vector = sorted(candidates, key=lambda c: c["similarity"], reverse=True)
+    by_lexical = sorted((c for c in candidates if c["lexical_score"] > 0), key=lambda c: c["lexical_score"], reverse=True)
+    hybrid = {id(c): 0.0 for c in candidates}
+    for rank, c in enumerate(by_vector, 1):
+        hybrid[id(c)] += 1 / (RRF_K + rank)
+    for rank, c in enumerate(by_lexical, 1):
+        hybrid[id(c)] += 1 / (RRF_K + rank)
+    for c in candidates:
+        c["hybrid_score"] = round(hybrid[id(c)], 6)
+
+    accepted = [c for c in candidates if c["similarity"] >= match_threshold or c["lexical_score"] >= LEXICAL_MIN_SCORE]
+    accepted.sort(key=lambda c: c["hybrid_score"], reverse=True)
+    return accepted[:top_k]
+
+
+def rank_local(query: str, query_embedding: List[float], chunks: List[Dict[str, Any]], top_k: int, match_threshold: float) -> List[Dict[str, Any]]:
+    """Busca híbrida sobre chunks em memória (cache local ou avaliação), sem Supabase."""
+    if not chunks:
+        return []
+    matrix = np.array([c["embedding"] for c in chunks], dtype=float)
+    q_vec = np.array(query_embedding, dtype=float)
+    norms = np.linalg.norm(matrix, axis=1) * np.linalg.norm(q_vec)
+    sims = np.divide(matrix @ q_vec, norms, out=np.zeros(len(chunks)), where=norms > 0)
+
+    candidates = [
+        {
+            "document_name": c["document_name"],
+            "chunk_index": c["chunk_index"],
+            "content": c["content"],
+            "metadata": c.get("metadata", {}),
+            "similarity": round(float(s), 4),
+        }
+        for c, s in zip(chunks, sims)
+    ]
+    return rank_hybrid(query, candidates, top_k, match_threshold)
+
 
 class DocumentProcessor:
     """
     Pipeline de Ingestão, Extração de Texto (OCR/PDF),
     Estruturação Tabular, Chunking e Geração de Embeddings com FastEmbed.
     """
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5"):
+    def __init__(self, model_name: str = DEFAULT_EMBEDDING_MODEL):
         self.model_name = model_name
         self.embedding_model = TextEmbedding(model_name=self.model_name)
         self.supabase_client: Client = None
@@ -49,9 +169,11 @@ class DocumentProcessor:
         chave_match = re.search(r"CHAVE DE ACESSO:\s*([0-9]{44})", text, re.IGNORECASE)
         
         emit_razao = re.search(r"Raz[ãa]o Social:\s*([^\n\r]+)", text)
-        emit_cnpj = re.search(r"CNPJ:\s*([0-9\.\/\-]+)", text)
-        
+        # "(?<!/)" evita casar o "CPF/CNPJ:" do destinatário
+        emit_cnpj = re.search(r"(?<!/)CNPJ:\s*([0-9\.\/\-]+)", text)
+
         dest_nome = re.search(r"Nome/Raz[ãa]o:\s*([^\n\r]+)", text)
+        dest_doc = re.search(r"CPF/CNPJ:\s*([0-9\.\/\-]+)", text)
         total_match = re.search(r"VALOR TOTAL DA NOTA:\s*([^\n\r]+)", text)
         obs_match = re.search(r"INFORMA[ÇC][ÕO]ES COMPLEMENTARES:\s*([^\n\r]+)", text)
 
@@ -64,6 +186,7 @@ class DocumentProcessor:
             "emitente": emit_razao.group(1).strip() if emit_razao else "N/A",
             "emitente_cnpj": emit_cnpj.group(1).strip() if emit_cnpj else "N/A",
             "destinatario": dest_nome.group(1).strip() if dest_nome else "N/A",
+            "destinatario_documento": dest_doc.group(1).strip() if dest_doc else "N/A",
             "valor_total": total_match.group(1).strip() if total_match else "N/A",
             "observacoes": obs_match.group(1).strip() if obs_match else "N/A",
             "conteudo_completo": text
@@ -80,13 +203,14 @@ class DocumentProcessor:
         chunks = []
 
         # Chunk 1: Resumo Geral e Identificação
+        # A chave de acesso (44 dígitos, muitos tokens) fica no fim: se o modelo truncar, perde só ela
         c1_text = (
             f"Nota Fiscal: {invoice_info['numero_nota']} (Série {invoice_info['serie']}). "
             f"Data de Emissão: {invoice_info['data_emissao']}. "
-            f"Chave de Acesso: {invoice_info['chave_acesso']}. "
             f"Emitente: {invoice_info['emitente']} (CNPJ: {invoice_info['emitente_cnpj']}). "
             f"Destinatário: {invoice_info['destinatario']}. "
-            f"Valor Total da Nota: {invoice_info['valor_total']}."
+            f"Valor Total da Nota: {invoice_info['valor_total']}. "
+            f"Chave de Acesso: {invoice_info['chave_acesso']}."
         )
         chunks.append({
             "document_name": filename,
@@ -106,7 +230,7 @@ class DocumentProcessor:
         c2_text = (
             f"Partes Envolvidas na NF {invoice_info['numero_nota']}: "
             f"Emitente: {invoice_info['emitente']} (CNPJ: {invoice_info['emitente_cnpj']}). "
-            f"Destinatário/Cliente: {invoice_info['destinatario']}. "
+            f"Destinatário/Cliente: {invoice_info['destinatario']} (CPF/CNPJ: {invoice_info['destinatario_documento']}). "
             f"Informações complementares e observações da operação: {invoice_info['observacoes']}."
         )
         chunks.append({
@@ -121,18 +245,24 @@ class DocumentProcessor:
             }
         })
 
-        # Chunk 3: Conteúdo Integral extraído do documento (Itens e Valores)
-        c3_text = f"Detalhamento completo e itens da NF {invoice_info['numero_nota']}:\n{full_text}"
-        chunks.append({
-            "document_name": filename,
-            "chunk_index": 2,
-            "content": c3_text,
-            "metadata": {
-                "tipo": "detalhamento_itens",
-                "numero_nota": invoice_info["numero_nota"],
-                "valor_total": invoice_info["valor_total"]
-            }
-        })
+        # Chunks 3+: Conteúdo Integral (Itens e Valores) em trechos curtos com sobreposição.
+        # Um chunk só com o PDF inteiro misturava tudo num vetor e passaria dos 128 tokens do modelo.
+        pieces = split_text(full_text)
+        for i, piece in enumerate(pieces, 1):
+            chunks.append({
+                "document_name": filename,
+                "chunk_index": len(chunks),
+                "content": f"NF {invoice_info['numero_nota']} ({invoice_info['emitente']}), trecho {i}/{len(pieces)}:\n{piece}",
+                "metadata": {
+                    "tipo": "detalhamento_itens",
+                    "numero_nota": invoice_info["numero_nota"],
+                    "valor_total": invoice_info["valor_total"],
+                    "trecho": i
+                }
+            })
+
+        for c in chunks:
+            c["metadata"]["embedding_model"] = self.model_name
 
         return chunks
 
@@ -187,9 +317,8 @@ class DocumentProcessor:
         }
 
         # Salva cópia local (cache rápido)
-        cache_file = os.path.join(os.path.dirname(__file__), "chunks_cache.json")
         try:
-            with open(cache_file, "w", encoding="utf-8") as f:
+            with open(CACHE_FILE, "w", encoding="utf-8") as f:
                 json.dump(chunks, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"[!] Erro ao salvar cache local: {e}")
@@ -230,72 +359,58 @@ class DocumentProcessor:
 
     def search_vector_store(self, query: str, top_k: int = 5, match_threshold: float = 0.35) -> List[Dict[str, Any]]:
         """
-        Busca semântica vetorial:
+        Busca híbrida:
         1. Gera embedding da query com FastEmbed
-        2. Executa busca vetorial no Supabase (via RPC match_documents)
-        3. Se tabela Supabase não estiver ativada, utiliza similaridade de cosseno local sobre os chunks
+        2. Busca candidatos vetoriais no Supabase (via RPC match_documents), sem threshold
+        3. Reordena os candidatos com o score lexical (RRF) e aplica o threshold em rank_hybrid
+        4. Se o Supabase não estiver disponível, faz o mesmo sobre o cache local de chunks
         """
         query_embedding = self.generate_embeddings([query])[0]
-        results = []
 
         # Tenta consulta no Supabase RPC
         if self.supabase_client:
             try:
+                # Pool maior que top_k: o threshold e o corte final ficam com a etapa híbrida
                 rpc_response = self.supabase_client.rpc("match_documents", {
                     "query_embedding": query_embedding,
-                    "match_threshold": match_threshold,
-                    "match_count": top_k
+                    "match_threshold": 0.0,
+                    "match_count": max(top_k * 4, 20)
                 }).execute()
 
-                if rpc_response.data and len(rpc_response.data) > 0:
-                    for row in rpc_response.data:
-                        results.append({
+                if rpc_response.data:
+                    candidates = [
+                        {
                             "id": row.get("id"),
                             "document_name": row.get("document_name"),
                             "chunk_index": row.get("chunk_index"),
                             "content": row.get("content"),
-                            "metadata": row.get("metadata", {}),
+                            "metadata": row.get("metadata") or {},
                             "similarity": float(row.get("similarity", 0.0))
-                        })
-                    return results
+                        }
+                        for row in rpc_response.data
+                    ]
+                    self._warn_if_model_mismatch(candidates)
+                    return rank_hybrid(query, candidates, top_k, match_threshold)
             except Exception as e:
                 print(f"[!] RPC Supabase match_documents não disponível ou falhou: {e}. Usando busca local.")
 
         # Fallback local sobre o cache de chunks
-        cache_file = os.path.join(os.path.dirname(__file__), "chunks_cache.json")
-        if os.path.exists(cache_file):
+        if os.path.exists(CACHE_FILE):
             try:
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(CACHE_FILE, "r", encoding="utf-8") as f:
                     cached_chunks = json.load(f)
-
-                q_vec = np.array(query_embedding)
-                scored = []
-                for chunk in cached_chunks:
-                    c_vec = np.array(chunk["embedding"])
-                    # Cosine similarity
-                    norm_q = np.linalg.norm(q_vec)
-                    norm_c = np.linalg.norm(c_vec)
-                    if norm_q > 0 and norm_c > 0:
-                        sim = float(np.dot(q_vec, c_vec) / (norm_q * norm_c))
-                    else:
-                        sim = 0.0
-
-                    if sim >= match_threshold:
-                        scored.append({
-                            "document_name": chunk["document_name"],
-                            "chunk_index": chunk["chunk_index"],
-                            "content": chunk["content"],
-                            "metadata": chunk.get("metadata", {}),
-                            "similarity": round(sim, 4)
-                        })
-
-                # Ordena pelos mais similares
-                scored.sort(key=lambda x: x["similarity"], reverse=True)
-                results = scored[:top_k]
+                self._warn_if_model_mismatch(cached_chunks)
+                return rank_local(query, query_embedding, cached_chunks, top_k, match_threshold)
             except Exception as e:
                 print(f"[!] Erro no fallback local: {e}")
 
-        return results
+        return []
+
+    def _warn_if_model_mismatch(self, chunks: List[Dict[str, Any]]) -> None:
+        """Vetores de outro modelo têm a mesma dimensão (384), mas comparar com eles dá resultado sem sentido."""
+        stored = {(c.get("metadata") or {}).get("embedding_model") for c in chunks}
+        if stored != {self.model_name}:
+            print(f"[!] Base indexada com outro modelo de embedding ({stored}). Rode a ingestão de novo para usar '{self.model_name}'.")
 
 if __name__ == "__main__":
     processor = DocumentProcessor()
