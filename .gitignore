@@ -105,3 +105,6 @@ desktop.ini
 .coverage
 htmlcov/
 .mypy_cache/
+
+# Dados locais do n8n (banco e chave de criptografia das credenciais)
+n8n-sandbox/n8n_data/

@@ -1,0 +1,16 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+    environment:
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false
+
+  sandbox-api:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - SANDBOX_API_KEY=chave_projeto_rag_2026
